@@ -377,6 +377,7 @@ const LuckyWheel = forwardRef<LuckyWheelHandle, ILuckyWheel>((props, ref) => {
   });
 
   const _renderKnob = () => {
+    if (props.knobSize === 0) return null;
     return (
       <Animated.View
         style={[
