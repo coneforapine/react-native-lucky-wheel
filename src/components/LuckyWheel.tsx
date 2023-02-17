@@ -189,6 +189,69 @@ const LuckyWheel = forwardRef<LuckyWheelHandle, ILuckyWheel>((props, ref) => {
     winnerLastOffset,
   ]);
 
+  const stopSpinningAtIndex = useCallback(
+    (index: number) => {
+      if (!isSpinning) return;
+      // calculate stop angle
+      // TODO: refactor the calculations
+      const isGestureSpinning = spinVelocity._value !== 0;
+      const isSpinningValid = Math.abs(spinVelocity._value) >= 1;
+      const velocity =
+        isGestureSpinning && props.enablePhysics && isSpinningValid
+          ? Math.round(Math.abs(spinVelocity._value))
+          : 1;
+
+      const WINNER_INDEX = index;
+      const WINNER = props.slices[index];
+
+      const WINNER_ANGLE = WINNER_INDEX * (ONE_TURN / SLICE_COUNT);
+      const WINNER_ANGLE_OFFSET = Utils.randomNumber(
+        -SLICE_ANGLE_CENTER + SLICE_ANGLE / 3,
+        SLICE_ANGLE_CENTER - SLICE_ANGLE / 3
+      );
+
+      const EXTRA_SPIN_DEGREE =
+        ONE_TURN * props.duration * spinCount * velocity;
+
+      const TARGET_ANGLE =
+        ONE_TURN -
+        WINNER_ANGLE +
+        EXTRA_SPIN_DEGREE -
+        winnerLastOffset +
+        WINNER_ANGLE_OFFSET;
+
+      Animated.timing(rotate, {
+        toValue: TARGET_ANGLE,
+        duration: DURATION_IN_MS,
+        easing:
+          props.easing === 'out'
+            ? Easing.out(Easing.cubic)
+            : Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        setIsSpinning(false);
+        spinVelocity.setValue(0);
+
+        if (props.onSpinningEnd) props.onSpinningEnd(WINNER);
+      });
+
+      setWinnerLastOffset(WINNER_ANGLE_OFFSET);
+      setSpinCount(spinCount + 1);
+    },
+    [
+      DURATION_IN_MS,
+      SLICE_ANGLE,
+      SLICE_ANGLE_CENTER,
+      SLICE_COUNT,
+      isSpinning,
+      props,
+      rotate,
+      spinCount,
+      spinVelocity,
+      winnerLastOffset,
+    ]
+  );
+
   useEffect(() => {
     if (isSpinning && props.waitWinner && props.winnerIndex) {
       rotate.resetAnimation(() => {
@@ -213,7 +276,11 @@ const LuckyWheel = forwardRef<LuckyWheelHandle, ILuckyWheel>((props, ref) => {
     start: () => {
       startSpinning();
     },
-    stop: () => {
+    stop: (atIndex?: number) => {
+      if (atIndex) {
+        stopSpinningAtIndex(atIndex);
+        return;
+      }
       rotate.stopAnimation();
     },
     reset: () => {
